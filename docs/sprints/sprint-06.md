@@ -105,13 +105,25 @@ Esses callbacks são passados na construção do `ClientSession(read, write, sam
 
 ## Perguntas de Validação
 
-> *(A preencher com as respostas do usuário)*
-
 1. Por que Sampling é descrito como uma "inversão de fluxo" em relação a Tools e Resources?
+
+   Porque em Tools e Resources é sempre o Client que inicia a interação (chama uma Tool, lê uma Resource) e o Server responde. Em Sampling, é o Server, no meio da execução de uma Tool, que envia uma requisição para o Client (`create_message`) e espera uma resposta — os papéis de quem pergunta e quem responde se invertem.
+
 2. O que aconteceria se chamássemos `resumir_via_sampling` a partir de um Client que não implementou `sampling_callback`?
+
+   A chamada falharia — o Client não teria como responder à requisição `create_message` vinda do Server, então a Tool receberia um erro em vez do resultado esperado.
+
 3. Por que o parâmetro `ctx: Context` não aparece no JSON Schema da Tool, mesmo fazendo parte da assinatura da função Python?
+
+   Porque o `FastMCP` reconhece o tipo `Context` especificamente e o trata como um parâmetro de infraestrutura injetado automaticamente, não como um argumento que o Client precisa fornecer — por isso ele é excluído do schema, o que confirmei tanto pelos testes quanto inspecionando a saída do `tools/list` via Inspector.
+
 4. Qual é a vantagem de testar Sampling com um callback stub em vez de sempre precisar de um LLM real configurado?
+
+   Permite validar que o mecanismo do protocolo (a Tool consegue enviar a requisição e receber uma resposta) funciona, sem depender de credenciais externas, custo de API, ou variabilidade de resposta de um LLM real — o teste fica determinístico e rápido.
+
 5. Para que serve, na prática, um Server perguntar ao Client quais Roots estão disponíveis, em vez de simplesmente receber um caminho de diretório como argumento de uma Tool?
+
+   Porque é o Client (que representa o usuário/ambiente local) quem sabe quais diretórios são relevantes e autorizados para aquela sessão — deixar o Server perguntar em vez de aceitar qualquer caminho como argumento de Tool evita que o Server precise confiar cegamente em um caminho arbitrário vindo de qualquer lugar.
 
 ---
 
@@ -132,8 +144,22 @@ Esses callbacks são passados na construção do `ClientSession(read, write, sam
 
 ## Perguntas de Entrevista
 
-> *(A preencher com as respostas do usuário)*
-
 1. Por que Sampling existe no protocolo em vez de cada Server simplesmente chamar a API de um provedor de LLM diretamente?
+
+   Porque assim o Server não precisa de credenciais próprias de nenhum provedor de LLM, nem escolhe qual modelo usar — quem paga e controla a inferência é o Client/usuário, que já tem essa relação estabelecida com seu próprio LLM. Isso também centraliza custo e políticas de uso do lado do Client, em vez de espalhar chaves de API por cada Server que alguém conectar.
+
 2. Que tipo de risco de segurança/custo o Sampling introduz do ponto de vista do Client, e como você mitigaria isso ao implementar um `sampling_callback` de verdade?
+
+   Um Server malicioso ou com bug poderia gerar requisições de Sampling excessivas (custo de API) ou tentar induzir o LLM a produzir conteúdo indevido via prompt injection. Mitigaria com limites de taxa/custo por sessão, exigindo aprovação explícita do usuário antes de cada Sampling (ou por sessão), e nunca expondo esse callback sem alguma forma de revisão humana em contextos sensíveis.
+
 3. Dado que Roots só *informa* diretórios relevantes (não dá permissão de acesso real ao filesystem), quem é responsável por de fato impor essa fronteira de segurança?
+
+   O próprio sistema operacional/processo do Server, através de permissões de arquivo reais, e o código do Server, que deve validar que qualquer caminho usado está de fato dentro dos Roots informados antes de ler/escrever — Roots é só um contrato de escopo, não um mecanismo de enforcement.
+
+**Nota geral: 9/10**
+
+**Q1 (9/10):** Resposta completa, cobre tanto a questão de credenciais quanto de controle de custo do lado do Client.
+
+**Q2 (9/10):** Identifica riscos reais (custo, prompt injection) e propõe mitigações razoáveis (rate limit, aprovação humana).
+
+**Q3 (9/10):** Resposta correta — reconhece que Roots é um contrato de escopo, não um mecanismo de segurança em si, e que a responsabilidade de validação é do código do Server.

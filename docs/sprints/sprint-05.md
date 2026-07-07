@@ -120,13 +120,25 @@ O ponto central da sprint: um Server MCP bem construído não sabe (nem precisa 
 
 ## Perguntas de Validação
 
-> *(A preencher com as respostas do usuário)*
-
 1. Por que o `client.py` recebe o comando do server via `--server` em vez de ter o comando fixo no código?
+
+   Para ser genérico e reutilizável contra qualquer server MCP que fale `stdio`, não só um específico — o mesmo princípio de design usado pelo próprio MCP Inspector.
+
 2. O que deu errado na primeira versão de `chamar_tool`, e por que envolvia especificamente `SystemExit` e não uma exceção comum?
+
+   Ela levantava `SystemExit(1)` dentro dos blocos `async with stdio_client(...)`/`async with ClientSession(...)`. Como `SystemExit` não é tratado como uma exceção de aplicação comum pelo `anyio`, ele interrompe o cleanup estruturado do `TaskGroup` e gera um `BaseExceptionGroup` com traceback longo, em vez de um encerramento limpo.
+
 3. Por que o mesmo `server.py` da Sprint 2 pôde ser usado, sem nenhuma alteração, pelo smoke test, pelo Inspector e por este Client customizado?
+
+   Porque o Server não sabe (nem precisa saber) quem está do outro lado — ele só implementa o protocolo MCP sobre `stdio`. Qualquer Client que fale o mesmo protocolo consegue se conectar, sem nenhuma mudança no Server.
+
 4. O que precisa existir no `claude_desktop_config.json` para o Claude Desktop reconhecer um novo server MCP?
+
+   Uma entrada em `mcpServers` com um nome para o server e um `command`/`args` que sobe o processo do server (ex: `uv run --directory <caminho> server.py`).
+
 5. Por que faz sentido usar `json.loads` para interpretar os argumentos passados na linha de comando (`id=999`) em vez de sempre tratá-los como string?
+
+   Porque as Tools esperam tipos específicos (int, bool) conforme o schema gerado na Sprint 2 — `json.loads` converte `"999"` em `int 999` e `"true"` em `bool True` automaticamente, evitando que o usuário precise se preocupar manualmente com conversão de tipos.
 
 ---
 
@@ -148,8 +160,22 @@ O ponto central da sprint: um Server MCP bem construído não sabe (nem precisa 
 
 ## Perguntas de Entrevista
 
-> *(A preencher com as respostas do usuário)*
-
 1. Por que `sys.exit()`/`SystemExit` dentro de um `async with TaskGroup` é perigoso, de forma geral — não só neste exercício?
+
+   Porque bibliotecas de concorrência estruturada tratam o cancelamento e o encerramento de tarefas de forma coordenada; uma `SystemExit` levantada no meio desse escopo interrompe esse fluxo de forma inesperada, sendo capturada e reembalada em um `ExceptionGroup`, mascarando a intenção original ("só quero encerrar o processo com este código") com um erro aparentemente não relacionado.
+
 2. Se você precisasse que este Client customizado funcionasse tanto com servers locais (`stdio`) quanto remotos (HTTP), o que mudaria na assinatura de `run()`?
+
+   Adicionaria um parâmetro para escolher o transporte (ex: `transporte: Literal["stdio", "http"]` e uma URL quando HTTP), e trocaria `stdio_client(params)` por `streamable_http_client(url, ...)` condicionalmente, mantendo o resto da lógica (ações list/call/read/prompt) igual, já que ela opera sobre a `ClientSession`, não sobre o transporte.
+
 3. Do ponto de vista de um Host como o Claude Desktop, o que ele precisa fazer, na prática, quando o usuário faz uma pergunta que pode ser respondida por uma Tool exposta por um dos servers configurados?
+
+   O Host inclui a lista de Tools disponíveis (obtida via `list_tools` de cada Client conectado) no contexto enviado ao LLM. O modelo decide, com base na pergunta, se deve chamar alguma Tool; se decidir, o Host recebe essa decisão e invoca `call_tool` no Client correspondente, devolvendo o resultado ao modelo para compor a resposta final.
+
+**Nota geral: 9/10**
+
+**Q1 (9/10):** Explicação correta e bem articulada sobre por que `SystemExit` conflita com concorrência estruturada.
+
+**Q2 (9/10):** Resposta sólida, identifica corretamente que só o transporte muda, não a lógica das ações — mostra entendimento da separação de camadas.
+
+**Q3 (9/10):** Descreve corretamente o ciclo "Host expõe tools ao modelo → modelo decide → Host executa via Client". Poderia acrescentar que o resultado da Tool volta para o modelo como mais uma mensagem de contexto antes da resposta final ao usuário.

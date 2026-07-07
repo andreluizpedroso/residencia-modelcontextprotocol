@@ -93,13 +93,25 @@ Segurança: todo acesso a arquivo passa por `_resolver_caminho_no_repo`, que res
 
 ## Perguntas de Validação
 
-> *(A preencher com as respostas do usuário)*
-
 1. Por que o bug do `git log` travando só apareceu testando via protocolo MCP, e nunca chamando `server.git_log()` diretamente num teste unitário?
+
+   Porque o bug dependia do `stdin` do processo do server ser, especificamente, o pipe de comunicação `stdio` com o Client MCP. Num teste unitário chamando a função Python diretamente no terminal, `stdin` é o teclado/console normal, então o subprocesso do `git` nunca tinha motivo para travar esperando input.
+
 2. O que `stdin=subprocess.DEVNULL` resolve especificamente, e por que isso é particularmente relevante para servers que usam transporte `stdio`?
+
+   Garante que o subprocesso do `git` nunca herde um `stdin` que na verdade pertence a outra coisa (o pipe do protocolo MCP) — ele simplesmente não tem nenhum stdin para ler, então nunca fica esperando input. É particularmente relevante em `stdio` porque é exatamente ali que o `stdin` do processo já está "ocupado" com outro propósito.
+
 3. Por que `repo://arquivo/docs/sprints/sprint-01.md` não funcionaria como URI de Resource, mesmo com o template `repo://arquivo/{caminho}` definido?
+
+   Porque o SDK converte `{caminho}` numa regex `[^/]+`, que não casa com nenhuma barra — um URI com várias barras depois de `arquivo/` simplesmente não bate com o padrão do template, então a Resource não seria encontrada.
+
 4. Que papel `Path.is_relative_to` cumpre em `_resolver_caminho_no_repo`, e o que aconteceria sem essa checagem?
+
+   Ele confirma que, depois de resolver o caminho (inclusive `..`), o resultado continua dentro de `REPO_PATH`. Sem essa checagem, um caminho como `../../../../windows/win.ini` conseguiria escapar do repositório e ler qualquer arquivo acessível ao processo do server — uma vulnerabilidade de path traversal.
+
 5. Por que todas as Tools deste server são somente leitura? O que mudaria na análise de risco se `git_commit`/`git_push` fossem adicionadas?
+
+   Porque um server somente leitura pode ser conectado a qualquer Host sem risco de alterar o repositório de forma automática/inesperada. Adicionar `git_commit`/`git_push` mudaria completamente a análise de risco: passaria a ser necessário considerar autenticação/autorização granular, confirmação explícita do usuário antes de cada ação, e proteção contra um LLM decidir fazer commit/push de forma indevida.
 
 ---
 
@@ -122,8 +134,22 @@ Segurança: todo acesso a arquivo passa por `_resolver_caminho_no_repo`, que res
 
 ## Perguntas de Entrevista
 
-> *(A preencher com as respostas do usuário)*
+1. Este server só tem Tools de leitura. Se você precisasse adicionar uma Tool `criar_branch`, que salvaguardas você colocaria antes de liberar isso para um Host qualquer?
 
-1. Este server só tem Tools de leitura. Se você precisasse adicionar uma Tool `criar_branch`, que salvaguardas (validação, confirmação, escopo de autenticação) você colocaria antes de liberar isso para um Host qualquer?
+   Exigiria autenticação com scope específico para operações de escrita (reaproveitando o mecanismo da Sprint 7), validaria o nome da branch contra um padrão seguro (evitando injeção de argumentos no `git`), e adicionaria uma etapa de confirmação explícita — por exemplo, retornando uma prévia da ação e só executando de fato numa segunda chamada, em vez de criar a branch imediatamente na primeira invocação do modelo.
+
 2. Como você generalizaria `_resolver_caminho_no_repo` para reutilizar em outro server que também precise expor leitura de arquivos de forma segura?
+
+   Extrairia a função para um módulo utilitário reutilizável, parametrizado pelo diretório raiz permitido (em vez de depender de `REPO_PATH` fixo), e a reaproveitaria em qualquer server que precise resolver e validar caminhos fornecidos pelo Client contra uma raiz específica.
+
 3. Dado tudo que foi construído nas 8 sprints, qual primitiva ou conceito você escolheria aprofundar em seguida, e por quê?
+
+   Aprofundaria autenticação/autorização granular por scope (mencionada mas não totalmente implementada na Sprint 7) e Sampling com um LLM real (só validado com stub na Sprint 6) — são os dois pontos onde o exercício ficou mais simplificado em relação a um cenário de produção completo.
+
+**Nota geral: 9/10**
+
+**Q1 (9/10):** Resposta completa, combina autenticação por scope, validação de entrada e um padrão de confirmação em duas etapas — mostra raciocínio de defesa em profundidade.
+
+**Q2 (9/10):** Identifica corretamente o parâmetro que precisa ser generalizado (a raiz permitida) para tornar a função reutilizável.
+
+**Q3 (9/10):** Escolhas coerentes com as próprias limitações documentadas nas Sprints 6 e 7 — mostra que as lacunas registradas ao longo do estudo foram internalizadas, não só anotadas.

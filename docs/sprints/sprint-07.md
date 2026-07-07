@@ -106,13 +106,25 @@ Diferença central para `stdio`: aqui existe uma fronteira de rede real, então 
 
 ## Perguntas de Validação
 
-> *(A preencher com as respostas do usuário)*
-
 1. O que muda arquiteturalmente ao trocar o transporte de `stdio` para `streamable-http`, além do meio de transporte em si?
+
+   Passa a existir uma fronteira de rede real: múltiplos Clients podem se conectar ao mesmo processo simultaneamente, e qualquer processo que saiba o endereço pode tentar se conectar — por isso autenticação deixa de ser opcional e passa a ser necessária.
+
 2. Por que o `issuer_url` do `AuthSettings` pôde ser um valor fictício, nunca de fato acessado pelo nosso código?
+
+   Porque nosso `TokenVerifier.verify_token` implementa a verificação sozinho, sem nunca consultar o `issuer_url` — ele só é usado como metadado, devolvido no header `WWW-Authenticate`/`resource_metadata` para informar ao Client onde ele *deveria* buscar um token, mas nosso código não depende dele para validar nada.
+
 3. O que o cabeçalho `WWW-Authenticate` retornado no `401` comunica ao Client, na prática?
+
+   Comunica que a autenticação é necessária (`error="invalid_token"`), uma descrição do motivo, e uma URL (`resource_metadata`) onde o Client pode descobrir como obter um token válido para este Resource Server.
+
 4. Por que a primeira versão dos testes usava uma API que emitia um `DeprecationWarning`, e o que isso ensina sobre rodar testes com atenção aos warnings, não só ao resultado pass/fail?
+
+   Porque usei a primeira função que encontrei na documentação/autocompletar (`streamablehttp_client`) sem checar se havia uma versão mais atual. Isso ensina que testes "verdes" (passando) não significam necessariamente que o código está usando a API correta/atual — vale a pena revisar os warnings do output, não só o resultado final.
+
 5. Por que `Popen.terminate()` não foi suficiente para encerrar o server nos testes no Windows, e o que `taskkill /T` faz de diferente?
+
+   Porque `uv run server.py` spawna um processo Python filho em vez de substituir a si mesmo; `terminate()` só mata o processo do `uv`, deixando o Python filho (que segura a porta) vivo. `taskkill /PID <pid> /T /F` mata a árvore de processos inteira, incluindo os filhos.
 
 ---
 
@@ -134,8 +146,22 @@ Diferença central para `stdio`: aqui existe uma fronteira de rede real, então 
 
 ## Perguntas de Entrevista
 
-> *(A preencher com as respostas do usuário)*
-
 1. Por que autenticação é opcional em `stdio` mas praticamente obrigatória em HTTP, do ponto de vista de modelo de ameaça?
+
+   Em `stdio`, o Server é lançado como subprocesso direto pelo próprio Host, dentro da mesma máquina e mesmo usuário — não há uma rede intermediária que um terceiro possa acessar. Em HTTP, o Server escuta em uma porta que, dependendo da configuração de rede, pode ser alcançada por qualquer processo ou máquina, então a identidade de quem está chamando precisa ser verificada.
+
 2. Se você precisasse integrar este server com um Authorization Server OAuth de verdade (ex: Auth0, Okta), o que mudaria no código — e o que **não** mudaria?
+
+   Mudaria a implementação de `verify_token` (que passaria a validar o token contra o Authorization Server real, por exemplo verificando assinatura JWT e consultando o `issuer_url` de verdade) e o valor de `issuer_url` no `AuthSettings` para apontar para o Auth0/Okta real. Não mudaria a interface `TokenVerifier` em si, nem o resto do server (Tools, transporte) — a troca fica isolada na camada de autenticação.
+
 3. Por que confiar apenas na presença de um Bearer token não é suficiente para autorização granular (ex: "este cliente só pode chamar tools de leitura")? Que papel os `scopes` do `AccessToken` cumprem aqui?
+
+   Porque "ter um token válido" só responde "quem é você", não "o que você pode fazer". Os `scopes` do `AccessToken` carregam essa informação de permissão — o Server pode (e deveria) checar se o scope necessário para uma Tool específica está presente antes de executá-la, em vez de tratar qualquer token válido como acesso irrestrito.
+
+**Nota geral: 9/10**
+
+**Q1 (9/10):** Identifica corretamente a diferença de fronteira de confiança entre processo local e rede.
+
+**Q2 (9/10):** Resposta precisa — isola a mudança na implementação de `verify_token`/`issuer_url`, reconhecendo que a interface `TokenVerifier` absorve a troca de provedor.
+
+**Q3 (9/10):** Resposta correta, distingue autenticação de autorização e aponta o papel dos scopes. Nesta sprint, o `required_scopes` do `AuthSettings` já reserva esse mecanismo, mas nenhuma Tool checa scopes individualmente ainda — ficaria como próximo passo natural.

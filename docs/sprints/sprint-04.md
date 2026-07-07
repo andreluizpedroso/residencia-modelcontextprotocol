@@ -118,13 +118,25 @@ O Inspector não substitui os smoke tests com `ClientSession` que já escrevemos
 
 ## Perguntas de Validação
 
-> *(A preencher com as respostas do usuário)*
-
 1. Quais são os dois processos que o MCP Inspector sobe, e qual a função de cada um?
+
+   Um proxy server (porta 6277), que fala o protocolo MCP de verdade com o server-alvo, e uma UI web (porta 6274), que consome o proxy e apresenta tools/resources/prompts de forma navegável.
+
 2. Qual a vantagem prática do modo `--cli` sobre o modo visual, e em que situação você escolheria cada um?
+
+   O `--cli` não depende de browser e pode ser usado em scripts/automação/CI. Escolheria o modo visual para exploração interativa e depuração humana, e o `--cli` quando preciso repetir uma checagem de forma programática ou não tenho interface gráfica disponível.
+
 3. Por que o JSON Schema que o Inspector mostra para uma Tool é idêntico ao que já teríamos previsto lendo o código da Sprint 2 (type hints + docstring)?
+
+   Porque o Inspector não inventa nada — ele só exibe o que o próprio `FastMCP` já gera automaticamente a partir dos type hints e da docstring da função. O Inspector é um Client como qualquer outro, então enxerga exatamente o schema que o Server expõe.
+
 4. O Inspector usa um token de sessão na própria URL. Que problema de segurança isso evita?
+
+   Evita que qualquer processo na mesma máquina (ou rede, se exposto) consiga se conectar ao proxy sem autorização — sem o token na URL, o proxy ficaria acessível a quem soubesse a porta, mesmo sem ter iniciado a sessão.
+
 5. Depois de rodar o Inspector, por que é importante encerrar os processos do proxy/UI explicitamente, em vez de simplesmente fechar a aba do browser?
+
+   Porque fechar a aba do browser não encerra os processos do proxy e da UI — eles continuam rodando e ocupando as portas 6274/6277, o que impede subir uma nova instância do Inspector depois (erro de "porta em uso"), como de fato aconteceu durante esta sprint.
 
 ---
 
@@ -136,8 +148,22 @@ Não aplicável nesta sprint — não há código de aplicação novo, apenas o 
 
 ## Perguntas de Entrevista
 
-> *(A preencher com as respostas do usuário)*
-
 1. Como o MCP Inspector ajudaria você a depurar um bug relatado por um usuário de produção num server MCP, mesmo sem acesso ao código-fonte do server?
+
+   Eu poderia apontar o Inspector para o mesmo comando/endereço do server e reproduzir a chamada suspeita manualmente — inspecionando o JSON-RPC bruto de requisição/resposta, sem precisar instrumentar código ou adicionar logs, já que o Inspector fala o protocolo diretamente.
+
 2. Por que faz sentido o Inspector existir como uma ferramenta separada do SDK, em vez de vir embutido em cada Client/Host?
-3. Em que ponto do ciclo de desenvolvimento de um Server MCP (antes do primeiro Tool? depois de vários Tools? antes de subir pra produção?) o Inspector agrega mais valor, na sua opinião?
+
+   Porque depuração é uma preocupação transversal — qualquer server, de qualquer linguagem, se beneficia de uma ferramenta de inspeção comum. Embutir isso em cada Host duplicaria esforço e acoplaria uma ferramenta de debug à lógica de produção de cada Host.
+
+3. Em que ponto do ciclo de desenvolvimento de um Server MCP o Inspector agrega mais valor, na sua opinião?
+
+   Logo depois de implementar as primeiras Tools/Resources, antes de escrever testes automatizados — é o momento onde exploração manual e rápida ajuda mais a validar se o schema e o comportamento estão como esperado, antes de formalizar isso em testes.
+
+**Nota geral: 8.5/10**
+
+**Q1 (8/10):** Resposta correta sobre reproduzir e inspecionar. Gap: poderia mencionar que isso só funciona se o ambiente de produção puder ser replicado localmente (mesmos dados/config) — nem sempre é o caso.
+
+**Q2 (9/10):** Boa resposta sobre reuso e separação de responsabilidades.
+
+**Q3 (8/10):** Resposta razoável. Um ponto adicional: o Inspector também agrega valor mais tarde, ao integrar com um Host novo, para confirmar que o schema exposto é compatível antes de depender de testes end-to-end mais caros.

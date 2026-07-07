@@ -76,13 +76,25 @@ Validação, como na Sprint 2, em duas camadas: pytest chamando as funções dir
 
 ## Perguntas de Validação
 
-> *(A preencher com as respostas do usuário)*
-
 1. Qual a diferença entre uma Resource estática e uma Resource template? Dê um exemplo de quando cada uma faz sentido.
+
+   Uma Resource estática tem uma URI fixa e representa um dado único (ex: `notes://list`, a lista completa). Uma Resource template tem uma URI parametrizada (`notes://{note_id}`) e representa uma família de recursos parecidos, endereçados por um identificador — faz sentido quando existem "N" itens do mesmo tipo (uma nota especifica, um arquivo especifico).
+
 2. Por que `list_resources()` não retornou `notes://{note_id}` nesta sprint? Que método retorna os templates?
+
+   Porque `notes://{note_id}` não é uma Resource concreta, é um template — só vira uma Resource real quando alguém substitui `{note_id}` por um valor e chama `read_resource`. Quem lista os templates é `list_resource_templates()`.
+
 3. Quando um Prompt deveria retornar uma lista de `Message`/`UserMessage` em vez de simplesmente uma `str`?
+
+   Quando é preciso controlar explicitamente o `role` de cada mensagem gerada (por exemplo, simular uma troca com múltiplas mensagens, ou marcar explicitamente uma mensagem como vinda do "assistant"). Retornar `str` é suficiente quando basta uma única mensagem de usuário.
+
 4. Por que faz mais sentido modelar a leitura de uma nota como Resource em vez de como Tool, dado o que vimos na Sprint 1 sobre a diferença entre as duas primitivas?
+
+   Porque ler uma nota não tem efeito colateral — é puramente uma consulta de dados, exatamente o caso de uso que Resources existem para cobrir. Usar uma Tool para isso confundiria a semântica (Tools sugerem ação) e tornaria a interface menos previsível para o Host decidir quando usá-la.
+
 5. O mecanismo de erro (`raise ValueError`) é o mesmo para Tools, Resources e Prompts. Por que essa consistência é uma vantagem para quem constrói servers MCP?
+
+   Porque quem escreve o server só precisa aprender um padrão de tratamento de erro, independente da primitiva — reduz a carga cognitiva e o risco de inconsistência (cada primitiva sinalizando erro de um jeito diferente).
 
 ---
 
@@ -104,8 +116,22 @@ Validação, como na Sprint 2, em duas camadas: pytest chamando as funções dir
 
 ## Perguntas de Entrevista
 
-> *(A preencher com as respostas do usuário)*
-
 1. Um Host decide pré-carregar todas as notas disponíveis no contexto antes mesmo do usuário pedir. Isso é mais natural com Tools ou com Resources? Por quê?
-2. Se você precisasse permitir que o usuário criasse notas novas em tempo de execução, isso seria uma Tool, uma Resource, ou os dois? Justifique.
+
+   Com Resources — elas são desenhadas justamente para leitura sem efeito colateral, o que as torna seguras para o Host buscar proativamente sem depender de uma decisão do modelo. Pré-carregar uma Tool não faria sentido, porque Tools representam ações que o modelo decide disparar deliberadamente.
+
+2. Se você precisasse permitir que o usuário criasse notas novas em tempo de execução, isso seria uma Tool, uma Resource, ou os dois?
+
+   Seria uma Tool (`criar_nota`) para a escrita, mantendo as Resources (`notes://list`, `notes://{note_id}`) só para leitura. Os dois coexistiriam: a Tool tem efeito colateral (cria estado novo), então pertence à primitiva de ação; a leitura continua sendo Resource.
+
 3. Por que a descoberta de capacidades no MCP é separada por tipo (`list_tools`, `list_resources`, `list_resource_templates`, `list_prompts`) em vez de um único `list_capabilities` genérico?
+
+   Porque cada primitiva tem uma semântica e um ciclo de uso diferente para o Client (Tools são chamadas pelo modelo, Resources são lidas, Prompts são disparados pelo usuário) — separar a descoberta deixa explícito para o Client o que ele pode fazer com cada item, em vez de precisar inspecionar um campo "tipo" dentro de uma lista genérica.
+
+**Nota geral: 9/10**
+
+**Q1 (9/10):** Identifica corretamente a ausência de efeito colateral como o motivo que torna Resources seguras para pré-carregamento.
+
+**Q2 (9/10):** Distinção correta entre leitura (Resource) e escrita com efeito colateral (Tool), e reconhece que os dois coexistem no mesmo domínio.
+
+**Q3 (9/10):** Boa resposta — a separação por tipo comunica semântica de uso ao Client. Ponto a acrescentar: também simplifica a paginação e o cache de cada lista independentemente.

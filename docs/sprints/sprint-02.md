@@ -78,13 +78,25 @@ Validamos isso de duas formas complementares:
 
 ## Perguntas de Validação
 
-> *(A preencher com as respostas do usuário)*
-
 1. O que o decorator `@mcp.tool()` faz automaticamente a partir da assinatura da função (nomes, tipos, docstring)?
+
+   Ele registra a função como uma Tool MCP, usando o nome da função como nome da Tool, gerando o JSON Schema dos parâmetros a partir dos type hints, e usando a docstring como descrição exibida ao Client. Tudo isso sem precisar declarar o schema manualmente.
+
 2. Por que faz sentido ter tanto testes unitários da função Python quanto um smoke test via `ClientSession` real? O que cada um garante que o outro não garante?
+
+   O teste unitário valida a lógica de negócio rápido (IDs sequenciais, filtros, erros), mas não passa pelo protocolo MCP de verdade. O smoke test com `ClientSession` garante que o schema gerado, a serialização e o dispatch funcionam de ponta a ponta — pegaria, por exemplo, um erro de schema que nenhum teste unitário detectaria.
+
 3. O que acontece, do ponto de vista do Client, quando uma Tool levanta uma exceção? O processo do Server cai?
+
+   O Client recebe um resultado com `isError=True` e a mensagem da exceção no conteúdo. O processo do Server continua rodando normalmente — a exceção é capturada pelo SDK e convertida em erro do protocolo, não propaga para derrubar o servidor.
+
 4. Por que o estado (`_tasks`) foi guardado em um dict em memória em vez de um arquivo ou banco? Que limitação prática isso traz?
+
+   Porque o estado só precisa sobreviver durante a sessão `stdio` daquele processo, e um dict é a forma mais simples de representar isso no exercício. A limitação é que qualquer reinício do processo do Server perde todas as tarefas — não há persistência entre sessões.
+
 5. Qual a diferença entre a API `FastMCP` (alto nível) e a API `Server` de baixo nível do SDK? Por que começamos pela primeira?
+
+   `FastMCP` gera o schema e o dispatch automaticamente a partir de funções decoradas; a API `Server` de baixo nível exige registrar manualmente os handlers e schemas de cada Tool/Resource/Prompt. Começamos pela `FastMCP` porque o objetivo inicial é entender as primitivas do protocolo, não a mecânica interna de registro de handlers.
 
 ---
 
@@ -106,8 +118,22 @@ Validamos isso de duas formas complementares:
 
 ## Perguntas de Entrevista
 
-> *(A preencher com as respostas do usuário)*
-
 1. Como você garantiria que múltiplas chamadas concorrentes a esse server não corrompam o estado, se o transporte fosse HTTP com vários clientes simultâneos?
+
+   Usaria um lock (`asyncio.Lock`) em torno das operações que leem e incrementam `_next_id`/`_tasks`, ou moveria o estado para um armazenamento que já trata concorrência corretamente (ex: um banco de dados com transações), em vez de um dict em memória compartilhado sem sincronização.
+
 2. Que tipo de validação de entrada você adicionaria antes de colocar esse server em produção, e por quê?
+
+   Validaria que `titulo` não é vazio/só espaços em branco, e limitaria seu tamanho máximo, para evitar tarefas inúteis ou payloads anormalmente grandes. Também validaria que `id` em `concluir_tarefa`/`remover_tarefa` é um inteiro positivo antes mesmo de consultar o dict.
+
 3. Qual a diferença entre uma Tool que retorna `str` e uma que retorna `list[dict]`? Como isso afeta o schema de saída relatado pelo MCP?
+
+   Uma Tool que retorna `str` gera um `outputSchema` simples (`{"result": {"type": "string"}}`), enquanto uma que retorna `list[dict]` gera um schema de array de objetos. Isso importa porque o Client (ou o LLM do lado do Host) usa esse schema para saber como interpretar e, eventualmente, validar a resposta antes de usá-la.
+
+**Nota geral: 9/10**
+
+**Q1 (9/10):** Resposta tecnicamente correta — lock ou storage transacional são as duas soluções padrão. Gap menor: poderia mencionar que, em muitos casos reais, é mais simples desenhar o storage para já ser "concurrency-safe" (ex: um banco) do que gerenciar locks manualmente na camada da aplicação.
+
+**Q2 (9/10):** Validações pertinentes e no nível certo de detalhe para este exercício.
+
+**Q3 (9/10):** Resposta correta e direta, identifica o mecanismo (outputSchema) e a consequência prática (Client sabe como interpretar o retorno).
