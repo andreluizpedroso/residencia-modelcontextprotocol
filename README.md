@@ -1,4 +1,4 @@
-# estudo-mcp — Model Context Protocol na prática
+# Estudo-MCP — Model Context Protocol na prática
 
 ![Sprint](https://img.shields.io/badge/Sprint-4%2F8-blue)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
