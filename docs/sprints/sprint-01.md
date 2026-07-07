@@ -78,25 +78,13 @@ Por baixo dos panos, as mensagens são **JSON-RPC 2.0**, trafegando sobre `stdio
 
 ## Perguntas de Validação
 
+> *(A preencher com as respostas do usuário)*
+
 1. Por que o MCP existe? Que problema, na prática, ele evita que cada equipe resolva sozinha?
-
-   O MCP existe para padronizar a forma como aplicações de IA se conectam a ferramentas e dados. Sem ele, cada equipe teria de criar integrações proprietárias e customizadas para cada sistema, o que gera um problema de multiplicação de esforço e manutenção em cenários de N aplicações × M ferramentas.
-
 2. Qual a diferença de responsabilidade entre Host, Client e Server?
-
-   O Host é a aplicação que o usuário usa e que contém o LLM; ele decide quando usar o MCP. O Client é a ponta do Host que mantém a conexão com um Server específico. O Server é o componente que expõe capacidades, como tools, resources e prompts, para o Host acessar.
-
 3. Se um Host precisa se conectar a dois servers diferentes, quantos Clients ele cria? Por quê?
-
-   Ele cria dois Clients, porque a relação entre Client e Server é 1:1. Cada Client representa uma conexão específica com um único Server.
-
 4. Qual a diferença entre uma Tool e um Resource? Dê um exemplo de cada que não esteja neste documento.
-
-   Uma Tool representa uma ação que pode ser executada, normalmente com efeito colateral, como criar algo ou disparar uma operação. Um Resource representa dados legíveis, sem efeito colateral, que podem ser consultados. Exemplo de Tool: "criar um ticket no Jira". Exemplo de Resource: "listar os últimos 10 commits de um repositório".
-
 5. Que formato de mensagem o MCP usa por baixo dos panos, e sobre quais transportes ele pode trafegar?
-
-   O MCP usa JSON-RPC 2.0 por baixo dos panos. Ele pode trafegar sobre stdio, para comunicação local via processo, e sobre HTTP, para comunicação remota.
 
 ---
 
@@ -117,17 +105,11 @@ O único código desta sprint é `servers/sprint-01-hello-mcp/main.py`, um scrip
 
 ## Perguntas de Entrevista
 
+> *(A preencher com as respostas do usuário)*
+
 1. Um recrutador pergunta: "o que é o MCP e por que ele importa?" — responda como se fosse essa entrevista, em poucas frases.
-
-   O MCP é um padrão aberto para conectar aplicações de IA a ferramentas e dados de forma interoperável. Ele importa porque reduz a complexidade de integrações sob medida e torna mais simples escalar soluções com LLMs em ambientes reais.
-
 2. Qual a diferença prática entre um Server MCP rodando via `stdio` e um rodando via HTTP? Em que cenário você escolheria cada um?
-
-   Um Server via `stdio` roda localmente, geralmente junto ao Host, e é mais adequado para integrações simples e rápidas em um ambiente de desktop ou desenvolvimento local. Um Server via HTTP é mais apropriado quando a capacidade precisa ficar disponível remotamente, para vários clientes ou em cenários com rede, autenticação e escalabilidade.
-
 3. Por que uma Tool não deveria ser usada para expor dados somente-leitura, se um Resource já existe para isso?
-
-   Porque Tool sugere ação e possivelmente efeito colateral, enquanto Resource é a abstração semântica correta para consulta de dados. Usar Tool para leitura só torna a interface menos clara, menos previsível e mais difícil de explorar e otimizar.
 
 ---
 
