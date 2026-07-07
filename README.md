@@ -1,6 +1,6 @@
 # Estudo-MCP — Model Context Protocol na prática
 
-![Sprint](https://img.shields.io/badge/Sprint-4%2F8-blue)
+![Sprint](https://img.shields.io/badge/Sprint-5%2F8-blue)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![MCP SDK](https://img.shields.io/badge/MCP-python--sdk-000000)
 
@@ -18,7 +18,7 @@ Referência oficial: [github.com/modelcontextprotocol](https://github.com/modelc
 | 2 | Primeiro MCP Server — Tools | ✅ Concluída |
 | 3 | Resources & Prompts | ✅ Concluída |
 | 4 | Testando com MCP Inspector | ✅ Concluída |
-| 5 | Client MCP customizado + conexão com um Host real | ⬜ Pendente |
+| 5 | Client MCP customizado + conexão com um Host real | ✅ Concluída |
 | 6 | Sampling & Roots | ⬜ Pendente |
 | 7 | Transporte remoto (HTTP) & Autenticação | ⬜ Pendente |
 | 8 | Projeto final — server MCP para um caso de uso real | ⬜ Pendente |
